@@ -3,14 +3,13 @@ package main
 import (
 	"context"
 	"crypto/tls"
-	"os/exec"
-
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/mail"
 	"net/smtp"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 
@@ -64,9 +63,15 @@ func main() {
 	} else {
 		panic(e)
 	}
-	to_addrs, e := msg.Header.AddressList("To")
-	if e != nil {
-		panic(e)
+	rcpt_addrs := make([]*mail.Address, 0, 16)
+	if a, e := msg.Header.AddressList("To"); e == nil {
+		rcpt_addrs = append(rcpt_addrs, a...)
+	}
+	if a, e := msg.Header.AddressList("Cc"); e == nil {
+		rcpt_addrs = append(rcpt_addrs, a...)
+	}
+	if a, e := msg.Header.AddressList("Bcc"); e == nil {
+		rcpt_addrs = append(rcpt_addrs, a...)
 	}
 	var client *smtp.Client
 	var a smtp.Auth
@@ -81,6 +86,7 @@ func main() {
 		header_list = []string{
 			"From",
 			"To",
+			"Cc",
 			"Subject",
 			"In-Reply-To",
 			"References",
@@ -117,6 +123,7 @@ func main() {
 		header_list = []string{
 			"From",
 			"To",
+			"Cc",
 			"Subject",
 			"In-Reply-To",
 			"References",
@@ -137,8 +144,6 @@ func main() {
 			RedirectURL: "https://localhost:8080",
 			Scopes:      []string{"offline_access", "https://outlook.office365.com/IMAP.AccessAsUser.All", "https://outlook.office365.com/SMTP.Send"},
 		}
-		// the RefreshToken is really a *secret* piece of information
-		// so do not share the source code!
 		token := &oauth2.Token{
 			TokenType:    "Bearer",
 			RefreshToken: user_config["refreshtoken"],
@@ -147,6 +152,7 @@ func main() {
 		header_list = []string{
 			"From",
 			"To",
+			"Cc",
 			"Subject",
 			"In-Reply-To",
 			"References",
@@ -189,10 +195,17 @@ func main() {
 	if e := client.Mail(me); e != nil {
 		panic(e)
 	}
-	for _, addr := range to_addrs {
+	done_addrs := make([]string, 0, len(rcpt_addrs))
+	for _, addr := range rcpt_addrs {
+		for _, d := range done_addrs {
+			if d == addr.String() {
+				continue
+			}
+		}
 		if e := client.Rcpt(addr.Address); e != nil {
 			panic(e)
 		}
+		done_addrs = append(done_addrs, addr.String())
 	}
 	data, e := client.Data()
 	if e != nil {
