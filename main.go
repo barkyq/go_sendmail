@@ -93,10 +93,6 @@ func main() {
 	if e != nil {
 		panic(e)
 	}
-	client, e := ClientConnect(a, hostname, port)
-	if e != nil {
-		panic(e)
-	}
 	rcpt_addrs := make([]*mail.Address, 0, 16)
 	if a, e := msg.Header.AddressList("To"); e == nil {
 		rcpt_addrs = append(rcpt_addrs, a...)
@@ -108,42 +104,50 @@ func main() {
 		rcpt_addrs = append(rcpt_addrs, a...)
 	}
 
-	if e := client.Mail(<-mechan); e != nil {
-		panic(e)
-	}
-	done_addrs := make([]string, 0, len(rcpt_addrs))
-	for _, addr := range rcpt_addrs {
-		for _, d := range done_addrs {
-			if d == addr.String() {
-				continue
-			}
+	func() {
+		if strings.SplitN(rcpt_addrs[0].Address, "@", 2)[0] == "nobody" {
+			fmt.Println("sending to nobody; no smtp")
+			return
 		}
-		if e := client.Rcpt(addr.Address); e != nil {
+		client, e := ClientConnect(a, hostname, port)
+		if e != nil {
 			panic(e)
 		}
-		done_addrs = append(done_addrs, addr.String())
-	}
-	data, e := client.Data()
-	if e != nil {
-		panic(e)
-	}
-	var wb *bufio.Writer
-	if i, e := raw_msg.Stat(); e != nil {
-		panic(e)
-	} else {
-		wb = bufio.NewWriterSize(data, int(i.Size()))
-	}
-
-	if _, e := WriteMessage(msg.Header, msg.Body, wb); e != nil {
-		panic(e)
-	} else if e := wb.Flush(); e != nil {
-		panic(e)
-	} else {
-		data.Close()
-		client.Close()
-		raw_msg.Close()
-	}
-
+		if e := client.Mail(<-mechan); e != nil {
+			panic(e)
+		}
+		done_addrs := make([]string, 0, len(rcpt_addrs))
+		for _, addr := range rcpt_addrs {
+			for _, d := range done_addrs {
+				if d == addr.String() {
+					continue
+				}
+			}
+			if e := client.Rcpt(addr.Address); e != nil {
+				panic(e)
+			}
+			done_addrs = append(done_addrs, addr.String())
+		}
+		data, e := client.Data()
+		if e != nil {
+			panic(e)
+		}
+		var wb *bufio.Writer
+		if i, e := raw_msg.Stat(); e != nil {
+			panic(e)
+		} else {
+			wb = bufio.NewWriterSize(data, int(i.Size()))
+		}
+		if _, e := WriteMessage(msg.Header, msg.Body, wb); e != nil {
+			panic(e)
+		} else if e := wb.Flush(); e != nil {
+			panic(e)
+		} else {
+			data.Close()
+			client.Close()
+			raw_msg.Close()
+		}
+	}()
 	arch := &ArchiveTicket{
 		hasher:  sha256.New(),
 		batons:  nil,

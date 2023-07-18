@@ -42,8 +42,6 @@ func WriteHeaders(headers mail.Header, w io.Writer) (n int, e error) {
 }
 
 var canonical_header_list = []string{
-	"From",
-	"Date",
 	"Message-ID",
 }
 
