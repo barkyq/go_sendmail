@@ -6,6 +6,7 @@ import (
 	"net/mail"
 )
 
+// TODO: need to fix; cannot handle long headers (important for To: and From:)
 func WriteMessage(headers mail.Header, r io.Reader, w io.Writer) (n int, e error) {
 	for _, h := range header_list {
 		if v := headers.Get(h); v != "" {
