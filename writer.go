@@ -1,16 +1,28 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"net/mail"
+	"strings"
 )
 
-// TODO: need to fix; cannot handle long headers (important for To: and From:)
+// TODO: need to fix; cannot handle long headers (important for To:)
+func header_fold(v string) string {
+	r := strings.NewReader(v)
+	if r.Len() > 500 {
+		panic("header too long")
+	}
+	return v
+}
+
+// TODO: need to fix; cannot handle long headers (important for To:)
 func WriteMessage(headers mail.Header, r io.Reader, w io.Writer) (n int, e error) {
 	for _, h := range header_list {
 		if v := headers.Get(h); v != "" {
-			if k, e := fmt.Fprintf(w, "%s: %s\n", h, v); e != nil {
+			folded := header_fold(v)
+			if k, e := fmt.Fprintf(w, "%s: %s\n", h, folded); e != nil {
 				return n + k, e
 			} else {
 				n += k
