@@ -5,24 +5,55 @@ import (
 	"fmt"
 	"io"
 	"net/mail"
-	"strings"
 )
 
 // TODO: need to fix; cannot handle long headers (important for To:)
-func header_fold(v string) string {
-	r := strings.NewReader(v)
-	if r.Len() > 500 {
-		panic("header too long")
-	}
-	return v
-}
-
-// TODO: need to fix; cannot handle long headers (important for To:)
 func WriteMessage(headers mail.Header, r io.Reader, w io.Writer) (n int, e error) {
+	if a, e := mail.ParseAddress(headers.Get("From")); e == nil {
+		if k, e := fmt.Fprintf(w, "From: %s\n", a.String()); e != nil {
+			return n + k, e
+		} else {
+			n += k
+		}
+	}
+
+	for _, s := range []string{"To", "Cc"} {
+		buffer := bytes.NewBuffer(nil)
+		if list, e := headers.AddressList(s); e != nil {
+			if e == mail.ErrHeaderNotPresent {
+				continue
+			} else {
+				return n, e
+			}
+		} else {
+			for i, x := range list {
+				if i > 0 {
+					if k, e := buffer.Write([]byte{',', '\r', '\n', ' '}); e != nil {
+						return n + k, e
+					} else {
+						n += k
+					}
+				}
+				if k, e := buffer.WriteString(x.String()); e != nil {
+					return n + k, e
+				} else {
+					n += k
+				}
+			}
+		}
+		if k, e := fmt.Fprintf(w, "%s: %s\n", s, buffer.Bytes()); e != nil {
+			return n + k, e
+		} else {
+			n += k
+		}
+	}
+
 	for _, h := range header_list {
 		if v := headers.Get(h); v != "" {
-			folded := header_fold(v)
-			if k, e := fmt.Fprintf(w, "%s: %s\n", h, folded); e != nil {
+			if len(v) > 500 {
+				panic("header too long")
+			}
+			if k, e := fmt.Fprintf(w, "%s: %s\n", h, v); e != nil {
 				return n + k, e
 			} else {
 				n += k
@@ -59,9 +90,6 @@ var canonical_header_list = []string{
 }
 
 var header_list = []string{
-	"From",
-	"To",
-	"Cc",
 	"Subject",
 	"In-Reply-To",
 	"References",
@@ -71,5 +99,4 @@ var header_list = []string{
 	"Content-Type",
 	"Content-Disposition",
 	"Content-Transfer-Encoding",
-	"Hash",
 }
