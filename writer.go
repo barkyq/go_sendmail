@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/mail"
+	"strings"
 )
 
 // TODO: need to fix; cannot handle long headers (important for To:)
@@ -48,12 +49,44 @@ func WriteMessage(headers mail.Header, r io.Reader, w io.Writer) (n int, e error
 		}
 	}
 
+	if list, e := headers.AddressList("Bcc"); e != nil && e != mail.ErrHeaderNotPresent {
+		return n, e
+	} else if e == mail.ErrHeaderNotPresent || len(list) == 0 {
+		// do nothing
+	} else if k, e := fmt.Fprintf(w, "Bcc: undisclosed recipients:;\n"); e != nil {
+		return k + n, e
+	} else {
+		n += k
+	}
+
 	for _, h := range header_list {
 		if v := headers.Get(h); v != "" {
-			if len(v) > 500 {
-				panic("header too long")
+			var counter = 0
+			buffer := bytes.NewBuffer(nil)
+			for i, x := range strings.Split(v, " ") {
+				b := counter+len(x) > 76
+				if i > 0 && b {
+					counter = 0
+					if k, e := buffer.Write([]byte{' ', '\r', '\n', ' '}); e != nil {
+						return n + k, e
+					} else {
+						n += k
+					}
+				} else if i > 0 && !b {
+					if k, e := buffer.Write([]byte{' '}); e != nil {
+						return n + k, e
+					} else {
+						n += k
+					}
+				}
+				if k, e := buffer.WriteString(x); e != nil {
+					return n + k, e
+				} else {
+					n += k
+					counter += k
+				}
 			}
-			if k, e := fmt.Fprintf(w, "%s: %s\n", h, v); e != nil {
+			if k, e := fmt.Fprintf(w, "%s: %s\n", h, buffer.Bytes()); e != nil {
 				return n + k, e
 			} else {
 				n += k
