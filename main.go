@@ -23,6 +23,7 @@ const conf_file = ".go_sendmail.conf"
 var targetdir = flag.String("t", "mail/target", "target directory")
 var portable = flag.Bool("p", false, "portable (not relative $HOME)")
 var noimap = flag.Bool("noimap", false, "do not upload to IMAP when plain")
+var nosmtp = flag.Bool("nosmtp", false, "do not send on SMTP (put into local mail directory)")
 
 func main() {
 	flag.Parse()
@@ -45,10 +46,9 @@ func main() {
 	var raw_msg *os.File
 	if f, e := os.CreateTemp("/tmp", "go_sendmail_tmp_"); e != nil {
 		panic(e)
-	} else if n, e := io.Copy(f, os.Stdin); e != nil {
+	} else if _, e := io.Copy(f, os.Stdin); e != nil {
 		panic(e)
 	} else if e := f.Close(); e != nil {
-		_ = n // size
 		panic(e)
 	} else if g, e := os.Open(f.Name()); e != nil {
 		panic(e)
@@ -106,8 +106,8 @@ func main() {
 
 	// SMTP handler
 	func() {
-		if strings.SplitN(rcpt_addrs[0].Address, "@", 2)[0] == "nobody" {
-			fmt.Println("sending to nobody; no smtp")
+		if strings.SplitN(rcpt_addrs[0].Address, "@", 2)[0] == "nobody" || *nosmtp {
+			fmt.Fprintln(os.Stderr, "sending to nobody; no smtp")
 			return
 		}
 		client, e := ClientConnect(a, hostname, port)
