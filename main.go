@@ -104,6 +104,7 @@ func main() {
 		rcpt_addrs = append(rcpt_addrs, a...)
 	}
 
+	// SMTP handler
 	func() {
 		if strings.SplitN(rcpt_addrs[0].Address, "@", 2)[0] == "nobody" {
 			fmt.Println("sending to nobody; no smtp")
@@ -148,6 +149,31 @@ func main() {
 			raw_msg.Close()
 		}
 	}()
+
+	// imap submission
+	if imap_a != nil && !*noimap {
+		if f, e := os.Open(raw_msg.Name()); e != nil {
+			panic(e)
+		} else if c, e := imapclient.DialTLS(imap_addr, nil); e != nil {
+			panic(e)
+		} else if e := c.Authenticate(imap_a); e != nil {
+			panic(e)
+		} else if stat, e := c.Select("sent", false); e != nil {
+			panic(e)
+		} else {
+			defer c.Logout()
+			buf := bytes.NewBuffer(nil)
+			if _, e := io.Copy(buf, f); e != nil {
+				panic(e)
+			} else if e := c.Append(stat.Name, []string{"\\Seen"}, time.Now(), buf); e != nil {
+				panic(e)
+			} else if e := f.Close(); e != nil {
+				panic(e)
+			}
+		}
+	}
+
+	// archive
 	arch := &ArchiveTicket{
 		hasher:  sha256.New(),
 		batons:  nil,
@@ -171,6 +197,7 @@ func main() {
 		} else if !i.IsDir() {
 			panic("invalid target directory structure")
 		}
+		// TODO: rewrite to target directory and remove CRLFs (notmuch emacs does not like them)
 		if e := os.Rename(raw_msg.Name(), new_name); e != nil {
 			panic(e)
 		} else {
@@ -183,25 +210,5 @@ func main() {
 	} else if e := exec.Command("notmuch", "tag", "-unread", "+sent", msgid_query).Run(); e != nil {
 		panic(e)
 	}
-	if imap_a != nil && !*noimap {
-		if f, e := os.Open(new_name); e != nil {
-			panic(e)
-		} else if c, e := imapclient.DialTLS(imap_addr, nil); e != nil {
-			panic(e)
-		} else if e := c.Authenticate(imap_a); e != nil {
-			panic(e)
-		} else if stat, e := c.Select("sent", false); e != nil {
-			panic(e)
-		} else {
-			defer c.Logout()
-			buf := bytes.NewBuffer(nil)
-			if _, e := io.Copy(buf, f); e != nil {
-				panic(e)
-			} else if e := c.Append(stat.Name, []string{"\\Seen"}, time.Now(), buf); e != nil {
-				panic(e)
-			} else if e := f.Close(); e != nil {
-				panic(e)
-			}
-		}
-	}
+
 }
