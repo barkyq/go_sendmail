@@ -55,10 +55,12 @@ func main() {
 	} else {
 		raw_msg = g
 	}
+
 	msg, e := mail.ReadMessage(raw_msg)
 	if e != nil {
 		panic(e)
 	}
+
 	mechan := make(chan string)
 	rp, wp := io.Pipe()
 	go func() {
@@ -139,6 +141,7 @@ func main() {
 		} else {
 			wb = bufio.NewWriterSize(data, int(i.Size()))
 		}
+		// msg.Body gets consumed
 		if _, e := WriteMessage(msg.Header, msg.Body, wb); e != nil {
 			panic(e)
 		} else if e := wb.Flush(); e != nil {
@@ -175,40 +178,20 @@ func main() {
 
 	// archive
 	arch := &ArchiveTicket{
-		hasher:  sha256.New(),
-		batons:  nil,
-		tickets: nil,
-		file:    raw_msg,
-		msg:     msg,
-		rb:      nil,
-		wb:      nil,
+		hasher:   sha256.New(),
+		header:   msg.Header,
+		filename: raw_msg.Name(),
 	}
-	var new_name string
-	if e := arch.Hash(); e != nil {
+	if name, e := arch.Submit(); e != nil {
 		panic(e)
 	} else {
-		first_byte := fmt.Sprintf("%02x", arch.digest[0])
-		rest_bytes := fmt.Sprintf("%02x", arch.digest[1:])
-		new_name = filepath.Join(*targetdir, first_byte, rest_bytes)
-		if i, e := os.Stat(filepath.Join(*targetdir, first_byte)); e != nil {
-			if e := os.MkdirAll(filepath.Join(*targetdir, first_byte), os.ModePerm); e != nil {
-				panic(e)
-			}
-		} else if !i.IsDir() {
-			panic("invalid target directory structure")
-		}
-		// TODO: rewrite to target directory and remove CRLFs (notmuch emacs does not like them)
-		if e := os.Rename(raw_msg.Name(), new_name); e != nil {
-			panic(e)
-		} else {
-			fmt.Println(new_name)
-		}
+		fmt.Println(name)
 	}
+
 	msgid_query := fmt.Sprintf("id:%s", strings.Trim(msg.Header.Get("Message-ID"), "<>"))
 	if e := exec.Command("notmuch", "new").Run(); e != nil {
 		panic(e)
 	} else if e := exec.Command("notmuch", "tag", "-unread", "+sent", msgid_query).Run(); e != nil {
 		panic(e)
 	}
-
 }
