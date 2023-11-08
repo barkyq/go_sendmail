@@ -188,6 +188,7 @@ func main() {
 		fmt.Println(name)
 	}
 
+	// notmuch
 	msgid_query := fmt.Sprintf("id:%s", strings.Trim(msg.Header.Get("Message-ID"), "<>"))
 	if e := exec.Command("notmuch", "new").Run(); e != nil {
 		panic(e)
