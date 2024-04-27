@@ -8,7 +8,7 @@ import (
 	"strings"
 )
 
-// TODO: need to fix; cannot handle long headers (important for To:)
+
 func WriteMessage(headers mail.Header, r io.Reader, w io.Writer) (n int, e error) {
 	if a, e := mail.ParseAddress(headers.Get("From")); e == nil {
 		if k, e := fmt.Fprintf(w, "From: %s\n", a.String()); e != nil {
@@ -29,20 +29,16 @@ func WriteMessage(headers mail.Header, r io.Reader, w io.Writer) (n int, e error
 		} else {
 			for i, x := range list {
 				if i > 0 {
-					if k, e := buffer.Write([]byte{',', '\r', '\n', ' '}); e != nil {
-						return n + k, e
-					} else {
-						n += k
+					if _, e := buffer.Write([]byte{',', '\r', '\n', ' '}); e != nil {
+						return n, e
 					}
 				}
-				if k, e := buffer.WriteString(x.String()); e != nil {
-					return n + k, e
-				} else {
-					n += k
+				if _, e := buffer.WriteString(x.String()); e != nil {
+					return n, e
 				}
 			}
 		}
-		if k, e := fmt.Fprintf(w, "%s: %s\n", s, buffer.Bytes()); e != nil {
+		if k, e := fmt.Fprintf(w, "%s: %s\r\n", s, buffer.Bytes()); e != nil {
 			return n + k, e
 		} else {
 			n += k
@@ -64,26 +60,21 @@ func WriteMessage(headers mail.Header, r io.Reader, w io.Writer) (n int, e error
 			var counter = 0
 			buffer := bytes.NewBuffer(nil)
 			for i, x := range strings.Split(v, " ") {
-				b := counter+len(x) > 76
+				b := counter+len(x)+1 > 76
 				if i > 0 && b {
 					counter = 0
-					if k, e := buffer.Write([]byte{' ', '\r', '\n', ' '}); e != nil {
-						return n + k, e
-					} else {
-						n += k
+					if _, e := buffer.Write([]byte{' ', '\r', '\n', ' '}); e != nil {
+						return n, e
 					}
 				} else if i > 0 && !b {
-					if k, e := buffer.Write([]byte{' '}); e != nil {
-						return n + k, e
-					} else {
-						n += k
+					if _, e := buffer.Write([]byte{' '}); e != nil {
+						return n, e
 					}
 				}
 				if k, e := buffer.WriteString(x); e != nil {
-					return n + k, e
+					return n, e
 				} else {
-					n += k
-					counter += k
+					counter += k + 1
 				}
 			}
 			if k, e := fmt.Fprintf(w, "%s: %s\n", h, buffer.Bytes()); e != nil {
