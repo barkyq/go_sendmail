@@ -106,10 +106,15 @@ func main() {
 		rcpt_addrs = append(rcpt_addrs, a...)
 	}
 
+	if strings.SplitN(rcpt_addrs[0].Address, "@", 2)[0] == "nobody" {
+		*noimap = true
+		*nosmtp = true
+	}
+
 	// SMTP handler
 	func() {
-		if strings.SplitN(rcpt_addrs[0].Address, "@", 2)[0] == "nobody" || *nosmtp {
-			fmt.Fprintln(os.Stderr, "sending to nobody; no smtp")
+		if *nosmtp {
+			fmt.Fprintln(os.Stderr, "no smtp")
 			return
 		}
 		client, e := ClientConnect(a, hostname, port)
