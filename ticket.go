@@ -59,8 +59,6 @@ func (arch *ArchiveTicket) Submit() (name string, err error) {
 			panic(e)
 		} else if e := inf.Close(); e != nil {
 			panic(e)
-		} else if e := os.Remove(inf.Name()); e != nil {
-			panic(e)
 		} else if e := outf.Close(); e != nil {
 			panic(e)
 		}
