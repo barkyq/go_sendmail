@@ -5,8 +5,6 @@ import (
 	"io"
 	"net/smtp"
 	"strings"
-
-	"github.com/emersion/go-sasl"
 )
 
 // LoadConfig loads a configuration file (json encoded) and returns the relevant information.
