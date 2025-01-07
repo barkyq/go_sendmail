@@ -26,7 +26,7 @@ type UserConfig struct {
 	RefreshToken string `json:"refreshtoken"`
 }
 
-func LoadConfig(r io.Reader) (smtp_hostname string, smtp_port string, smtp_a smtp.Auth, imap_addr string, imap_a sasl.Client, e error) {
+func LoadConfig(r io.Reader) (smtp_hostname string, smtp_port string, smtp_a smtp.Auth, e error) {
 	user_config := new(UserConfig)
 
 	// load config from os.Stdin
@@ -42,8 +42,6 @@ func LoadConfig(r io.Reader) (smtp_hostname string, smtp_port string, smtp_a smt
 	switch user_config.Type {
 	case "plain":
 		smtp_a = smtp.PlainAuth("", user_config.User, user_config.Password, smtp_hostname)
-		imap_a = sasl.NewPlainClient("", user_config.User, user_config.Password)
-		imap_addr = user_config.IMAPServer
 	case "gmail":
 		// see https://developers.google.com/gmail/imap/imap-smtp#session_length_limits
 		config, token := Gmail_Generate_Token(user_config.ClientID, user_config.ClientSecret, user_config.RefreshToken)

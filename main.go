@@ -2,7 +2,6 @@ package main
 
 import (
 	"bufio"
-	"bytes"
 	"crypto/sha256"
 	"encoding/json"
 	"flag"
@@ -13,16 +12,12 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
-	"time"
-
-	imapclient "github.com/emersion/go-imap/client"
 )
 
 const conf_file = ".go_sendmail.conf"
 
 var targetdir = flag.String("t", "mail/target", "target directory")
 var portable = flag.Bool("p", false, "portable (not relative $HOME)")
-var noimap = flag.Bool("noimap", false, "do not upload to IMAP when plain")
 var nosmtp = flag.Bool("nosmtp", false, "do not send on SMTP (put into local mail directory)")
 
 func main() {
@@ -91,7 +86,7 @@ func main() {
 			panic(e)
 		}
 	}()
-	hostname, port, a, imap_addr, imap_a, e := LoadConfig(rp)
+	hostname, port, a, e := LoadConfig(rp)
 	if e != nil {
 		panic(e)
 	}
@@ -106,8 +101,8 @@ func main() {
 		rcpt_addrs = append(rcpt_addrs, a...)
 	}
 
+	// nobody handler
 	if strings.SplitN(rcpt_addrs[0].Address, "@", 2)[0] == "nobody" {
-		*noimap = true
 		*nosmtp = true
 	}
 
@@ -151,35 +146,14 @@ func main() {
 			panic(e)
 		} else if e := wb.Flush(); e != nil {
 			panic(e)
-		} else {
-			data.Close()
-			client.Close()
-			raw_msg.Close()
+		} else if e := data.Close(); e != nil {
+			panic(e)
+		} else if e := client.Close(); e != nil {
+			panic(e)
+		} else if e := raw_msg.Close(); e != nil {
+			panic(e)
 		}
 	}()
-
-	// imap submission
-	if imap_a != nil && !*noimap {
-		if f, e := os.Open(raw_msg.Name()); e != nil {
-			panic(e)
-		} else if c, e := imapclient.DialTLS(imap_addr, nil); e != nil {
-			panic(e)
-		} else if e := c.Authenticate(imap_a); e != nil {
-			panic(e)
-		} else if stat, e := c.Select("sent", false); e != nil {
-			panic(e)
-		} else {
-			defer c.Logout()
-			buf := bytes.NewBuffer(nil)
-			if _, e := io.Copy(buf, f); e != nil {
-				panic(e)
-			} else if e := c.Append(stat.Name, []string{"\\Seen"}, time.Now(), buf); e != nil {
-				panic(e)
-			} else if e := f.Close(); e != nil {
-				panic(e)
-			}
-		}
-	}
 
 	// archive
 	arch := &ArchiveTicket{
