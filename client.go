@@ -6,44 +6,36 @@ import (
 	"net/smtp"
 )
 
-func ClientConnect(a smtp.Auth, hostname string, port string) (*smtp.Client, error) {
-	client := new(smtp.Client)
+func ClientConnect(a smtp.Auth, hostname string, port string) (client *smtp.Client, err error) {
 	switch port {
 	case "465":
-		if conn, e := tls.Dial("tcp", fmt.Sprintf("%s:%s", hostname, port), nil); e == nil {
-			client, e = smtp.NewClient(conn, hostname)
-			if e != nil {
-				return nil, e
-			}
-			e = client.Auth(a)
-			if e != nil {
-				return nil, e
-			}
+		if conn, e := tls.Dial("tcp", fmt.Sprintf("%s:%s", hostname, port), nil); e != nil {
+			err = e
+		} else if c, e := smtp.NewClient(conn, hostname); e != nil {
+			err = e
+		} else if e := c.Auth(a); e != nil {
+			err = e
 		} else {
-			return nil, e
+			client = c
 		}
 	case "587":
-		if c, e := smtp.Dial(fmt.Sprintf("%s:%s", hostname, port)); e == nil {
-			if e := c.StartTLS(&tls.Config{ServerName: hostname}); e == nil {
-				if e := c.Auth(a); e == nil {
-					client = c
-				} else {
-					return nil, e
-				}
-			} else {
-				return nil, e
-			}
+		if c, e := smtp.Dial(fmt.Sprintf("%s:%s", hostname, port)); e != nil {
+			err = e
+		} else if e := c.StartTLS(&tls.Config{ServerName: hostname}); e != nil {
+			err = e
+		} else if e := c.Auth(a); e != nil {
+			err = e
 		} else {
-			return nil, e
+			client = c
 		}
 	default:
 		if c, e := smtp.Dial(fmt.Sprintf("%s:%s", hostname, port)); e != nil {
-			return nil, e
+			err = e
 		} else if e := c.Auth(a); e != nil {
-			return nil, e
+			err = e
 		} else {
 			client = c
 		}
 	}
-	return client, nil
+	return
 }
