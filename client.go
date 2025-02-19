@@ -36,6 +36,14 @@ func ClientConnect(a smtp.Auth, hostname string, port string) (*smtp.Client, err
 		} else {
 			return nil, e
 		}
+	default:
+		if c, e := smtp.Dial(fmt.Sprintf("%s:%s", hostname, port)); e != nil {
+			return nil, e
+		} else if e := c.Auth(a); e != nil {
+			return nil, e
+		} else {
+			client = c
+		}
 	}
 	return client, nil
 }
